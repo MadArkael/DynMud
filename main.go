@@ -122,6 +122,10 @@ func initRooms() []*Room {
 		{z: 0, x: 3, y: 2},   //Alentys
 		{z: 0, x: -1, y: 3},  //farvik
 		{z: 0, x: -3, y: 1},  //borash
+		{name: "Above the Plaza", nColor: BLUE, desc: "As you climb the fountain, you get a view of the entire settlement.", dColor: RED, z: 1, x: 0, y: 0},
+		{name: "Below the Plaza", nColor: BLUE, desc: "As you dive in below the fountain, you see tiny reflections of light off the coins people wished into the fountain.", dColor: RED, z: -1, x: 0, y: 0},
+		{name: "Above a market stall", nColor: BLUE, desc: "You look across the flat roofs of the settlement and see the mountain peaks in the distance.", dColor: RED, z: 1, x: -3, y: 1},
+		{name: "Below a market stall", nColor: BLUE, desc: "A pit, theres nasty stuff in here. I should probably have this description be longer than textwrap or it wont display anything!", dColor: RED, z: -1, x: 3, y: 2},
 	}
 	return rooms
 }
@@ -398,13 +402,41 @@ func buildMap(cl *Client) string {
 	for y := yVar + 5; y > yVar-6; y-- {
 		for x := xVar - 5; x < xVar+6; x++ {
 			if r, ok := W.roomMap[zVar][y][x]; ok {
-				if y == yVar && x == xVar {
-					textMap = textMap + CYAN + " R" + RESET
-				} else {
-					if len(r.clients) != 0 {
-						textMap = textMap + RED + " R" + RESET
+				if W.roomMap[zVar+1][y][x] != nil && W.roomMap[zVar-1][y][x] != nil {
+					if y == yVar && x == xVar {
+						textMap = textMap + CYAN + " S" + RESET
 					} else {
-						textMap = textMap + " R"
+						textMap = textMap + " S"
+					}
+				} else {
+					if W.roomMap[zVar+1][y][x] != nil {
+						if y == yVar && x == xVar {
+							textMap = textMap + CYAN + " ^" + RESET
+						} else {
+							textMap = textMap + " ^"
+						}
+					} else {
+						if W.roomMap[zVar-1][y][x] != nil {
+							if y == yVar && x == xVar {
+								textMap = textMap + CYAN + " v" + RESET
+							} else {
+								textMap = textMap + " v"
+							}
+						} else {
+							if y == yVar && x == xVar {
+								textMap = textMap + CYAN + " Y" + RESET
+							} else {
+								if len(r.clients) != 0 {
+									textMap = textMap + RED + " P" + RESET
+								} else {
+									if r.char != "" {
+										textMap = textMap + r.char
+									} else {
+										textMap = textMap + " D"
+									}
+								}
+							}
+						}
 					}
 				}
 			} else {
@@ -422,7 +454,10 @@ func buildMap(cl *Client) string {
 func (r *Room) getDisplay(cl *Client) string {
 	str := ""
 	lines := strings.Split(buildMap(cl), "\r\n")
-	lineD := strings.Split(r.nColor+r.name+RESET+NWLN+textWrapString(r.dColor, r.desc, textWrap-25)+r.dispOtherClients(cl), "\r\n")
+	lD := r.nColor + r.name + RESET + NWLN
+	lD += textWrapString(r.dColor, r.desc, textWrap-25)
+	lD += r.dispOtherClients(cl)
+	lineD := strings.Split(lD, "\r\n")
 
 	lLines := len(lines)
 	lDesc := len(lineD)
