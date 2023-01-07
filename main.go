@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math"
 	"net"
+	"strings"
 )
 
 var clientIn chan ClientInput
@@ -30,7 +30,9 @@ const (
 
 type Room struct {
 	name    string
+	nColor  string
 	desc    string
+	dColor  string
 	char    string
 	clients []*Client
 	z       int
@@ -61,6 +63,12 @@ type OutputEvent struct {
 	output string
 }
 
+type DisconnectEvent struct {
+}
+
+type ConnectEvent struct {
+}
+
 type Client struct {
 	conn net.Conn
 	name string
@@ -72,13 +80,13 @@ type Client struct {
 
 func initRooms() []*Room {
 	rooms := []*Room{
-		{name: "The Plaza", desc: "    The plaza is a hub of activity, with people bustling about and vendors shouting out their wares. The smells of delicious street food fill the air, and the sound of music and laughter can be heard everywhere. The fountain at the center of the plaza gurgles and sprays water into the air, providing a refreshing respite from the hot sun. Street performers and artists line the edges of the plaza, offering a constant stream of entertainment. The energy of the city seems to radiate from this one central location, making it a true heart of the community.", z: 0, x: 0, y: 0}, //central
-		{z: 0, x: 0, y: 1},
+		{name: "The Plaza", nColor: BLUE, desc: "    The plaza is a hub of activity, with people bustling about and vendors shouting out their wares. The fountain at the center of the plaza gurgles and sprays water into the air, providing a refreshing respite from the hot sun. The energy of the city seems to radiate from this one central location, making it a true heart of the community.", dColor: RED, z: 0, x: 0, y: 0}, //central
+		{name: "North of the Plaza", nColor: BLUE, desc: "    The street to the north is bustling with activity, as merchants hawk their wares and peasants haggle for goods. The smell of roasting meat and freshly baked bread fills the air.", dColor: RED, z: 0, x: 0, y: 1},
 		{z: 0, x: 0, y: 2}, //naryas
 		{z: 0, x: 0, y: 3},
 		{z: 0, x: 0, y: 4},
 		{z: 0, x: 0, y: 5}, //gate fire
-		{z: 0, x: 0, y: -1},
+		{name: "South of the Plaza", nColor: BLUE, desc: "    The street to the south is a busy thoroughfare, with knights on horseback and peasants on foot traveling to and fro. The sound of clanging swords and armor can be heard from the nearby training grounds.", dColor: RED, z: 0, x: 0, y: -1},
 		{z: 0, x: 0, y: -2},
 		{z: 0, x: 0, y: -3},
 		{z: 0, x: 0, y: -4},
@@ -87,8 +95,8 @@ func initRooms() []*Room {
 		{z: 0, x: -4, y: 0},
 		{z: 0, x: -3, y: 0},
 		{z: 0, x: -2, y: 0},
-		{z: 0, x: -1, y: 0},
-		{z: 0, x: 1, y: 0},
+		{name: "West of the Plaza", nColor: BLUE, desc: "    The street to the west is a mix of noble manors and humble homes. Children play in the dirt streets, and the occasional chicken or goat can be seen wandering about.", dColor: RED, z: 0, x: -1, y: 0},
+		{name: "East of the Plaza", nColor: BLUE, desc: "    The street to the east is more peaceful, with quaint cottages and gardens dotted along the way. The occasional horse-drawn carriage clatters by, kicking up a trail of dust.", dColor: RED, z: 0, x: 1, y: 0},
 		{z: 0, x: 2, y: 0},
 		{z: 0, x: 3, y: 0},
 		{z: 0, x: 4, y: 0},
@@ -116,31 +124,6 @@ func initRooms() []*Room {
 		{z: 0, x: -3, y: 1},  //borash
 	}
 	return rooms
-}
-
-func buildMap(cl *Client) string {
-	zVar, yVar, xVar := cl.getLocation()
-	textMap := ""
-	for y := yVar + 5; y > yVar-6; y-- {
-		for x := xVar - 5; x < xVar+6; x++ {
-			if r, ok := W.roomMap[zVar][y][x]; ok {
-				if y == yVar && x == xVar {
-					textMap = textMap + CYAN + " R" + RESET
-				} else {
-					if len(r.clients) != 0 {
-						textMap = textMap + RED + " R" + RESET
-					} else {
-						textMap = textMap + " R"
-					}
-
-				}
-			} else {
-				textMap = textMap + " -"
-			}
-		}
-		textMap = textMap + "\r\n"
-	}
-	return textMap
 }
 
 func addRooms(rooms []*Room, roomsMap map[int]map[int]map[int]*Room) {
@@ -220,14 +203,59 @@ func removeClientFromSlice(c *Client, cs []*Client) []*Client {
 	return temp
 }
 
-func (c *Client) update(z int, y int, x int, dir string) {
+func (c *Client) broadcastLeaving(dir string) {
+	for _, cl := range c.room.clients {
+		if cl != c {
+			clientOut <- ClientOutput{cl, &OutputEvent{fmt.Sprintf(CYAN+"%s"+RESET+" heads %s.", c.name, dir)}}
+		}
+	}
+}
+
+func opposite(dir string) string {
+	s := ""
+	switch dir {
+	case "n":
+		s = "south"
+	case "s":
+		s = "north"
+	case "e":
+		s = "west"
+	case "w":
+		s = "east"
+	case "nw":
+		s = "south east"
+	case "ne":
+		s = "south west"
+	case "se":
+		s = "north west"
+	case "sw":
+		s = "north east"
+	case "u":
+		s = "below"
+	case "d":
+		s = "above"
+	}
+	return s
+}
+
+func (c *Client) broadcastArriving(from string) {
+	clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You head %s.\r\n%s", from, c.room.getDisplay(c))}}
+	for _, cl := range c.room.clients {
+		if cl != c {
+			clientOut <- ClientOutput{cl, &OutputEvent{fmt.Sprintf(CYAN+"%s"+RESET+" arrives from the %s.", c.name, opposite(from))}}
+		}
+	}
+}
+
+func (c *Client) updateClientLocation(z int, y int, x int, dir string) {
+	c.broadcastLeaving(dir)
 	c.room.clients = removeClientFromSlice(c, c.room.clients)
 	c.room = getRoomByCoords(z, y, x)
 	c.room.clients = append(c.room.clients, c)
 	c.z = z
 	c.y = y
 	c.x = x
-	clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You head %s.\r\n%s", dir, c.room.getDisplay(c))}}
+	c.broadcastArriving(dir)
 }
 
 func (c *Client) move(dir string) {
@@ -245,103 +273,173 @@ func (c *Client) move(dir string) {
 	switch dir {
 	case "ne":
 		if r, ok := W.roomMap[ne[0]][ne[1]][ne[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "nw":
 		if r, ok := W.roomMap[nw[0]][nw[1]][nw[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "se":
 		if r, ok := W.roomMap[se[0]][se[1]][se[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "sw":
 		if r, ok := W.roomMap[sw[0]][sw[1]][sw[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "n":
 		if r, ok := W.roomMap[n[0]][n[1]][n[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "s":
 		if r, ok := W.roomMap[s[0]][s[1]][s[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "e":
 		if r, ok := W.roomMap[e[0]][e[1]][e[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "w":
 		if r, ok := W.roomMap[w[0]][w[1]][w[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "u":
 		if r, ok := W.roomMap[u[0]][u[1]][u[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	case "d":
 		if r, ok := W.roomMap[d[0]][d[1]][d[2]]; ok {
-			c.update(r.z, r.y, r.x, dir)
+			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
 			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
 		}
 	}
 }
 
-func (r *Room) getDisplay(cl *Client) string {
-	lines := math.Ceil(float64(len(r.desc)) / float64(textWrap))
-	str := BLUE + r.name + RESET + NWLN
-	pos1 := 0
-	pos2 := textWrap
-	breakFor := false
-	for x := 0; x < int(lines); x++ {
-		s := r.desc[pos1:pos2]
-		pos1 = pos2
-		pos2 = pos2 + textWrap
-
-		if pos2 > len(r.desc) {
-			pos2 = len(r.desc)
-			breakFor = true
-		}
-		if !breakFor {
-			for r.desc[pos2-1:pos2] != " " {
-				pos2--
-			}
-		}
-		if pos1 < len(r.desc)-70 {
+// take strng, color it with color, and wrap it neatly at lng length max.
+func textWrapString(color string, strng string, lng int) string {
+	s := ""
+	x := lng
+	oldx := 0
+	lenDesc := len(strng)
+	for x < lenDesc {
+		for strng[x-1:x] != " " {
 			x--
 		}
-		str += RED + s + NWLN + RESET
-		if pos1 == len(r.desc) {
-			str = str[:len(str)-6] + RESET
+		s += color + strng[oldx:x] + RESET + NWLN
+		oldx = x
+		if x+lng >= lenDesc {
+			s += color + strng[oldx:] + RESET
 			break
 		}
+		x += lng
 	}
+	return s
+}
+
+func (r *Room) dispOtherClients(cl *Client) string {
+	str := ""
 	for _, c := range r.clients {
 		if c != cl {
-			str += NWLN + "    " + c.name + " is standing here."
+			str += NWLN + "    " + CYAN + c.name + RESET + " is standing here."
 		}
 	}
-
 	return str
+}
+
+func buildMap(cl *Client) string {
+	zVar, yVar, xVar := cl.getLocation()
+	textMap := ""
+	for y := yVar + 5; y > yVar-6; y-- {
+		for x := xVar - 5; x < xVar+6; x++ {
+			if r, ok := W.roomMap[zVar][y][x]; ok {
+				if y == yVar && x == xVar {
+					textMap = textMap + CYAN + " R" + RESET
+				} else {
+					if len(r.clients) != 0 {
+						textMap = textMap + RED + " R" + RESET
+					} else {
+						textMap = textMap + " R"
+					}
+				}
+			} else {
+				textMap = textMap + " -"
+			}
+		}
+		if y == yVar-5 {
+			return textMap
+		}
+		textMap = textMap + "\r\n"
+	}
+	return textMap
+}
+
+func (r *Room) getDisplay(cl *Client) string {
+	str := ""
+	lines := strings.Split(buildMap(cl), "\r\n")
+	lineD := strings.Split(r.nColor+r.name+RESET+NWLN+textWrapString(r.dColor, r.desc, textWrap-25)+r.dispOtherClients(cl), "\r\n")
+
+	lLines := len(lines)
+	lDesc := len(lineD)
+	if lLines > lDesc {
+		dif := lLines - lDesc
+		for i := 0; i < lLines; i++ {
+			if i < dif {
+				str += lines[i] + " | " + NWLN
+			} else {
+				str += lines[i] + " | " + lineD[i-dif] + NWLN
+			}
+		}
+	}
+	if lLines == lDesc {
+		for i := 0; i < lLines; i++ {
+			str += lines[i] + " | " + lineD[i] + NWLN
+		}
+	}
+	if lLines < lDesc {
+		dif := lDesc - lLines
+		for i := 0; i < lDesc; i++ {
+			if i < dif {
+				str += "                      " + " | " + lineD[i] + NWLN
+			} else {
+				str += lines[i-dif] + " | " + lineD[i] + NWLN
+			}
+		}
+	}
+	/*for i := 0; i < maxLen; i++ {
+		if i < lLines && i < lDesc {
+			str += lines[i] + " | " + lineD[i] + NWLN
+		} else {
+			if i < lLines {
+				str += lines[i] + " | " + NWLN
+			}
+			if i < lDesc {
+				str += "                      " + " | " + lineD[i] + NWLN
+			}
+		}
+	}*/
+	//str += r.nColor + r.name + RESET + NWLN
+	//str += textWrapString(r.dColor, r.desc)
+	//str += r.dispOtherClients(cl)
+	return str[:len(str)-2]
 }
 
 func (c *Client) writeLnF(msg string, args ...interface{}) {
@@ -362,16 +460,20 @@ func clientHandler(chI chan ClientInput, chO chan ClientOutput, conn net.Conn) {
 	name, er := reader.ReadString('\n')
 	if er != nil {
 		consoleOut <- "Error receiving name line from client."
+		conn.Close()
 		return
 	}
 
 	cl := &Client{conn: conn, name: name[:len(name)-2], x: 0, y: 0, z: 0, room: getRoomByCoords(0, 0, 0)}
 	chO <- ClientOutput{cl, &OutputEvent{fmt.Sprintf("Thanks %s!\r\n"+cl.room.getDisplay(cl), cl.name)}}
 	cl.room.clients = append(cl.room.clients, cl)
+	chO <- ClientOutput{cl, &ConnectEvent{}}
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			consoleOut <- "Error receiving line from client."
+			clientOut <- ClientOutput{cl, &DisconnectEvent{}}
+			conn.Close()
 			return
 		}
 
@@ -391,6 +493,7 @@ func startListener(chI chan ClientInput, chO chan ClientOutput) error {
 		conn, err := ln.Accept()
 		if err != nil {
 			consoleOut <- "Error handing off the connection to the client."
+			conn.Close()
 			return err
 		}
 		go clientHandler(chI, chO, conn)
@@ -439,6 +542,19 @@ func startOut(chO <-chan ClientOutput) {
 		switch e := out.evt.(type) {
 		case *OutputEvent:
 			out.cl.writeLnF(e.output)
+		case *DisconnectEvent:
+			for _, c := range out.cl.room.clients {
+				if c != out.cl {
+					c.writeLnF(CYAN+"%s"+RESET+" has disconnected.", out.cl.name)
+				}
+			}
+			out.cl.room.clients = removeClientFromSlice(out.cl, out.cl.room.clients)
+		case *ConnectEvent:
+			for _, c := range out.cl.room.clients {
+				if c != out.cl {
+					c.writeLnF(CYAN+"%s"+RESET+" has connected.", out.cl.name)
+				}
+			}
 		}
 		out.cl.writeLnF(out.cl.getPrompt())
 	}
