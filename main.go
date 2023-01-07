@@ -206,7 +206,7 @@ func removeClientFromSlice(c *Client, cs []*Client) []*Client {
 func (c *Client) broadcastLeaving(dir string) {
 	for _, cl := range c.room.clients {
 		if cl != c {
-			clientOut <- ClientOutput{cl, &OutputEvent{fmt.Sprintf(CYAN+"%s"+RESET+" heads %s.", c.name, dir)}}
+			clientOut <- ClientOutput{cl, &OutputEvent{fmt.Sprintf(CYAN+"%s"+RESET+" heads %s.", c.name, abbrevToNorm(dir))}}
 		}
 	}
 }
@@ -239,7 +239,7 @@ func opposite(dir string) string {
 }
 
 func (c *Client) broadcastArriving(from string) {
-	clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You head %s.\r\n%s", from, c.room.getDisplay(c))}}
+	clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You head %s.\r\n%s", abbrevToNorm(from), c.room.getDisplay(c))}}
 	for _, cl := range c.room.clients {
 		if cl != c {
 			clientOut <- ClientOutput{cl, &OutputEvent{fmt.Sprintf(CYAN+"%s"+RESET+" arrives from the %s.", c.name, opposite(from))}}
@@ -256,6 +256,33 @@ func (c *Client) updateClientLocation(z int, y int, x int, dir string) {
 	c.y = y
 	c.x = x
 	c.broadcastArriving(dir)
+}
+
+func abbrevToNorm(dir string) string {
+	switch dir {
+	case "ne":
+		return "north east"
+	case "nw":
+		return "north west"
+	case "se":
+		return "south east"
+	case "sw":
+		return "south west"
+	case "s":
+		return "south"
+	case "n":
+		return "north"
+	case "w":
+		return "west"
+	case "e":
+		return "east"
+	case "u":
+		return "up"
+	case "d":
+		return "down"
+	default:
+		return dir
+	}
 }
 
 func (c *Client) move(dir string) {
@@ -275,61 +302,61 @@ func (c *Client) move(dir string) {
 		if r, ok := W.roomMap[ne[0]][ne[1]][ne[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "nw":
 		if r, ok := W.roomMap[nw[0]][nw[1]][nw[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "se":
 		if r, ok := W.roomMap[se[0]][se[1]][se[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "sw":
 		if r, ok := W.roomMap[sw[0]][sw[1]][sw[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "n":
 		if r, ok := W.roomMap[n[0]][n[1]][n[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "s":
 		if r, ok := W.roomMap[s[0]][s[1]][s[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "e":
 		if r, ok := W.roomMap[e[0]][e[1]][e[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "w":
 		if r, ok := W.roomMap[w[0]][w[1]][w[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "u":
 		if r, ok := W.roomMap[u[0]][u[1]][u[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	case "d":
 		if r, ok := W.roomMap[d[0]][d[1]][d[2]]; ok {
 			c.updateClientLocation(r.z, r.y, r.x, dir)
 		} else {
-			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", dir)}}
+			clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf("You cant go %s.", abbrevToNorm(dir))}}
 		}
 	}
 }
@@ -467,12 +494,12 @@ func clientHandler(chI chan ClientInput, chO chan ClientOutput, conn net.Conn) {
 	cl := &Client{conn: conn, name: name[:len(name)-2], x: 0, y: 0, z: 0, room: getRoomByCoords(0, 0, 0)}
 	chO <- ClientOutput{cl, &OutputEvent{fmt.Sprintf("Thanks %s!\r\n"+cl.room.getDisplay(cl), cl.name)}}
 	cl.room.clients = append(cl.room.clients, cl)
-	chO <- ClientOutput{cl, &ConnectEvent{}}
+	chI <- ClientInput{cl, &ConnectEvent{}}
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			consoleOut <- "Error receiving line from client."
-			clientOut <- ClientOutput{cl, &DisconnectEvent{}}
+			clientIn <- ClientInput{cl, &DisconnectEvent{}}
 			conn.Close()
 			return
 		}
@@ -533,6 +560,12 @@ func startIn(chI <-chan ClientInput, chO chan ClientOutput) {
 					}
 				}
 			}
+		case *ConnectEvent:
+			for _, c := range in.cl.room.clients {
+				if c != in.cl {
+					clientOut <- ClientOutput{c, &OutputEvent{fmt.Sprintf(CYAN+"%s"+RESET+" has connected.", in.cl.name)}}
+				}
+			}
 		}
 	}
 }
@@ -549,12 +582,6 @@ func startOut(chO <-chan ClientOutput) {
 				}
 			}
 			out.cl.room.clients = removeClientFromSlice(out.cl, out.cl.room.clients)
-		case *ConnectEvent:
-			for _, c := range out.cl.room.clients {
-				if c != out.cl {
-					c.writeLnF(CYAN+"%s"+RESET+" has connected.", out.cl.name)
-				}
-			}
 		}
 		out.cl.writeLnF(out.cl.getPrompt())
 	}
