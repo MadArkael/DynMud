@@ -406,21 +406,33 @@ func buildMap(cl *Client) string {
 					if y == yVar && x == xVar {
 						textMap = textMap + CYAN + " S" + RESET
 					} else {
-						textMap = textMap + " S"
+						if len(r.clients) != 0 {
+							textMap = textMap + RED + " S" + RESET
+						} else {
+							textMap = textMap + " S"
+						}
 					}
 				} else {
 					if W.roomMap[zVar+1][y][x] != nil {
 						if y == yVar && x == xVar {
 							textMap = textMap + CYAN + " ^" + RESET
 						} else {
-							textMap = textMap + " ^"
+							if len(r.clients) != 0 {
+								textMap = textMap + RED + " ^" + RESET
+							} else {
+								textMap = textMap + " ^"
+							}
 						}
 					} else {
 						if W.roomMap[zVar-1][y][x] != nil {
 							if y == yVar && x == xVar {
 								textMap = textMap + CYAN + " v" + RESET
 							} else {
-								textMap = textMap + " v"
+								if len(r.clients) != 0 {
+									textMap = textMap + RED + " v" + RESET
+								} else {
+									textMap = textMap + " v"
+								}
 							}
 						} else {
 							if y == yVar && x == xVar {
